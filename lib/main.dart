@@ -1,4 +1,8 @@
+import 'package:floor/floor.dart';
 import 'package:flutter/material.dart';
+import 'database.dart';
+import 'dao.dart';
+import 'item.dart';
 
 void main() {
   runApp(const MyApp());
@@ -26,11 +30,25 @@ class MyHomePage extends StatefulWidget {
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
+
 }
+
 List<String> words =  [] ;
 var wordsArray = <String>[ ];
 bool emptyList = true;
+var selectedName;
+var selectedId;
+var selectedQuan;
+/*
+Widget detailspage() {
+  if (selectedItem != null)
+  return Column(
+    children: [
 
+    ],
+  );
+}
+*/
 Widget listpage(){
   return Column( children:[
     Expanded(child:
@@ -50,6 +68,66 @@ Widget listpage(){
 
 class _MyHomePageState extends State<MyHomePage> {
   final TextEditingController _itemName = TextEditingController(), _itemQuantity = TextEditingController();
+
+  late AppDatabase database;
+  bool dbReady = false;
+
+  @override
+  void initState() {
+
+    super.initState();
+    intializeDatabase();
+  }
+
+  Future<void> intializeDatabase() async {
+    database = await $FloorAppDatabase
+        .databaseBuilder('app_database.db')
+        .build();
+    setState(() {
+      dbReady = true;
+    });
+    await _loadItems();
+  }
+
+  List<Item> items = [];
+
+  Future<void> _loadItems() async {
+    if (!dbReady) return;
+    final allItems = await database.itemDao.findAllItems();
+    setState(() {
+      items = allItems;
+    });
+  }
+
+  Future<void> addItem() async {
+    if (!dbReady) return;
+    final name = _itemName.text.trim();
+    final quantity = int.tryParse(_itemQuantity.text.trim()) ?? 0;
+
+    if (name.isEmpty || quantity <= 0) return;
+
+
+    final newitem = Item(null, name, quantity);
+    await database.itemDao.insertItem(newitem);
+
+    _itemName.clear();
+    _itemQuantity.clear();
+
+    await _loadItems();
+  }
+
+  Future<void> _deleteItem(Item item) async {
+    if (!dbReady) return;
+    await database.itemDao.deleteItem(item);
+    await _loadItems();
+  }
+  Widget reactiveLayout()  {
+    return Row(
+        children: [
+          listpage(), //Left side
+          //detailspage() //Right side
+        ]);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -81,20 +159,17 @@ class _MyHomePageState extends State<MyHomePage> {
         labelText: 'Type the quantity here'))),
           Expanded (
               child: ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                    words.add( _itemName.value.text + " Quantity: " + _itemQuantity.value.text);
-                    _itemName.text = "";
-                    _itemQuantity.text = "";
-                    emptyList = false;
-                  });
+                  onPressed: () async {
+                    await addItem();
+
                     },
               child: const Text('Submit Items'),
           )
           )
             ],
         ),// END OF ROW ///////////////////////////////////////
-Expanded(
+
+            Expanded(
   child: Stack(
                 children: <Widget>[
                   Center(
@@ -102,22 +177,27 @@ Expanded(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Visibility(
-                          visible: emptyList,
+                          visible: items.isEmpty,
                           child: Text('There are no items in the list.', style: new TextStyle(fontSize: 24),),
                         )
                       ],
                     ),
                   ),
+
                   ListView.builder(
-                itemCount: words.length,
-                itemBuilder: (context, rowNum) {
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
                   return GestureDetector(
-                  onLongPress : () {
+                  onTap: () {
+                    selectedId = item.id;
+                    selectedName = item.name;
+                    selectedQuan = item.quantity;
                     showDialog(context: context,
                         builder:
                         (BuildContext context) => AlertDialog(
                           title: const Text('Confirm Delete'),
-                          content: const Text('Are you sure you want to delete entry?'),
+                          content: Text('Id: $selectedId Name: $selectedName Quantity: $selectedQuan'),
                           actions: <Widget>[
                             TextButton(
                                 onPressed: () { Navigator.pop(context, 'Cancel');},
@@ -126,24 +206,19 @@ Expanded(
                             TextButton(
                                 onPressed: () {
                                   Navigator.pop(context, 'Delete');
-                                  words.removeAt(rowNum);
-                                  if (words.isEmpty) {
-                                    emptyList = true;
-                                  }
-                                  setState(() {
-                                  });
+                                  _deleteItem(item);
                                   },
                                 child: const Text('Delete')
 
                             )
                           ],
                         ));
-                  setState(() {
-                  });
                   },
-                  child: Row( mainAxisAlignment: MainAxisAlignment.center,
-                      children: [Text("${rowNum + 1}: "), Text(words[rowNum])]
-                  )
+                    child: ListTile(
+                      leading: Text('${index + 1}'),
+                      title: Text(item.name),
+                      subtitle: Text('Quantity: ${item.quantity}'),
+                    ),
                   );
                 }
                 ),
