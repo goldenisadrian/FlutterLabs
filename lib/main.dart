@@ -206,7 +206,7 @@ class _MyHomePageState extends State<MyHomePage> {
                       );
                     },
                   );
-
+//
                   if (isWideScreen) {
                     return Row(
                       children: [
