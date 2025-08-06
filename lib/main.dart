@@ -25,71 +25,36 @@ class MyApp extends StatelessWidget {
 
 class MyHomePage extends StatefulWidget {
   const MyHomePage({super.key, required this.title});
-
   final String title;
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
-
 }
-
-List<String> words =  [] ;
-var wordsArray = <String>[ ];
-bool emptyList = true;
-var selectedName;
-var selectedId;
-var selectedQuan;
-/*
-Widget detailspage() {
-  if (selectedItem != null)
-  return Column(
-    children: [
-
-    ],
-  );
-}
-*/
-Widget listpage(){
-  return Column( children:[
-    Expanded(child:
-    ListView.builder( itemCount:words.length,
-        itemBuilder: (context, rowNum) {  return
-          Row( mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children:[
-
-              ]);
-        }
-    )
-    )
-  ]);
-}
-
-
 
 class _MyHomePageState extends State<MyHomePage> {
-  final TextEditingController _itemName = TextEditingController(), _itemQuantity = TextEditingController();
+  final TextEditingController _itemName = TextEditingController();
+  final TextEditingController _itemQuantity = TextEditingController();
 
   late AppDatabase database;
   bool dbReady = false;
 
+  List<Item> items = [];
+  Item? selectedItem;
+
   @override
   void initState() {
-
     super.initState();
     intializeDatabase();
   }
 
   Future<void> intializeDatabase() async {
-    database = await $FloorAppDatabase
-        .databaseBuilder('app_database.db')
-        .build();
+    database =
+        await $FloorAppDatabase.databaseBuilder('app_database.db').build();
     setState(() {
       dbReady = true;
     });
     await _loadItems();
   }
-
-  List<Item> items = [];
 
   Future<void> _loadItems() async {
     if (!dbReady) return;
@@ -106,9 +71,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (name.isEmpty || quantity <= 0) return;
 
-
-    final newitem = Item(null, name, quantity);
-    await database.itemDao.insertItem(newitem);
+    final newItem = Item(null, name, quantity);
+    await database.itemDao.insertItem(newItem);
 
     _itemName.clear();
     _itemQuantity.clear();
@@ -121,113 +85,155 @@ class _MyHomePageState extends State<MyHomePage> {
     await database.itemDao.deleteItem(item);
     await _loadItems();
   }
-  Widget reactiveLayout()  {
-    return Row(
-        children: [
-          listpage(), //Left side
-          //detailspage() //Right side
-        ]);
+
+  Widget buildDetailView(Item item, bool isWideScreen) {
+    return Card(
+      margin: EdgeInsets.all(16),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("ID: ${item.id}", style: TextStyle(fontSize: 18)),
+            SizedBox(height: 8),
+            Text("Name: ${item.name}", style: TextStyle(fontSize: 22)),
+            SizedBox(height: 8),
+            Text("Quantity: ${item.quantity}", style: TextStyle(fontSize: 18)),
+            SizedBox(height: 20),
+            Row(
+              children: [
+                ElevatedButton(
+                  onPressed: () async {
+                    await _deleteItem(item);
+                    setState(() => selectedItem = null);
+                    if (!isWideScreen) Navigator.pop(context);
+                  },
+                  child: Text("Delete"),
+                ),
+                SizedBox(width: 10),
+                ElevatedButton(
+                  onPressed: () {
+                    setState(() => selectedItem = null);
+                    if (!isWideScreen) Navigator.pop(context);
+                  },
+                  child: Text("Close"),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         title: Text(widget.title),
         centerTitle: true,
       ),
-      body: Center(
+      body: Padding(
+        padding: const EdgeInsets.all(8.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Expanded (
-        child: TextField(
-          controller: _itemName,
-            decoration: InputDecoration(
-                border: OutlineInputBorder(),
-                labelText: 'Type the item here'))),
-    Expanded (
-          child: TextField(
-            controller: _itemQuantity,
-    decoration: InputDecoration(
-        border: OutlineInputBorder(),
-        labelText: 'Type the quantity here'))),
-          Expanded (
-              child: ElevatedButton(
-                  onPressed: () async {
-                    await addItem();
-
-                    },
-              child: const Text('Submit Items'),
-          )
-          )
-            ],
-        ),// END OF ROW ///////////////////////////////////////
-
-            Expanded(
-  child: Stack(
-                children: <Widget>[
-                  Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Visibility(
-                          visible: items.isEmpty,
-                          child: Text('There are no items in the list.', style: new TextStyle(fontSize: 24),),
-                        )
-                      ],
+          children: [
+            // Input Row
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _itemName,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Type the item here',
                     ),
                   ),
-
-                  ListView.builder(
-                itemCount: items.length,
-                itemBuilder: (context, index) {
-                  final item = items[index];
-                  return GestureDetector(
-                  onTap: () {
-                    selectedId = item.id;
-                    selectedName = item.name;
-                    selectedQuan = item.quantity;
-                    showDialog(context: context,
-                        builder:
-                        (BuildContext context) => AlertDialog(
-                          title: const Text('Confirm Delete'),
-                          content: Text('Id: $selectedId Name: $selectedName Quantity: $selectedQuan'),
-                          actions: <Widget>[
-                            TextButton(
-                                onPressed: () { Navigator.pop(context, 'Cancel');},
-                                child: const Text('Cancel')
-                            ),
-                            TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context, 'Delete');
-                                  _deleteItem(item);
-                                  },
-                                child: const Text('Delete')
-
-                            )
-                          ],
-                        ));
-                  },
-                    child: ListTile(
-                      leading: Text('${index + 1}'),
-                      title: Text(item.name),
-                      subtitle: Text('Quantity: ${item.quantity}'),
-                    ),
-                  );
-                }
                 ),
-  ]
+                SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    controller: _itemQuantity,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      labelText: 'Type the quantity here',
+                    ),
+                    keyboardType: TextInputType.number,
+                  ),
+                ),
+                SizedBox(width: 8),
+                ElevatedButton(onPressed: addItem, child: Text('Submit Item')),
+              ],
             ),
-)
+            SizedBox(height: 16),
+
+            // List and Detail Layout
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  bool isWideScreen = constraints.maxWidth > 600;
+
+                  Widget list = ListView.builder(
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            selectedItem = item;
+                          });
+
+                          if (!isWideScreen) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder:
+                                    (_) => Scaffold(
+                                      appBar: AppBar(
+                                        title: Text("Item Details"),
+                                      ),
+                                      body: buildDetailView(item, false),
+                                    ),
+                              ),
+                            );
+                          }
+                        },
+                        child: ListTile(
+                          leading: Text('${index + 1}'),
+                          title: Text(item.name),
+                          subtitle: Text('Quantity: ${item.quantity}'),
+                        ),
+                      );
+                    },
+                  );
+//
+                  if (isWideScreen) {
+                    return Row(
+                      children: [
+                        Flexible(flex: 2, child: list),
+                        VerticalDivider(),
+                        Flexible(
+                          flex: 3,
+                          child:
+                              selectedItem != null
+                                  ? buildDetailView(selectedItem!, true)
+                                  : Center(
+                                    child: Text(
+                                      'Select an item to view details',
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    );
+                  } else {
+                    return list;
+                  }
+                },
+              ),
+            ),
           ],
         ),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      ),
     );
   }
 }
